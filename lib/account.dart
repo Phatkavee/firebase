@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-
 class AccountPage extends StatefulWidget {
   @override
   _AccountPageState createState() => _AccountPageState();
@@ -16,9 +15,47 @@ class _AccountPageState extends State<AccountPage> {
 
   String _selectedStatus = 'โสด'; // ค่าเริ่มต้นของสถานะ
   bool _isLoading = false;
+  String? _documentId; // เก็บ ID ของเอกสารที่กำลังแก้ไข
 
   // สร้างอ้างอิงไปยัง collection 'cycle' ใน Firestore
   final CollectionReference cycleCollection = FirebaseFirestore.instance.collection('cycle');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingData();
+  }
+
+  // ดึงข้อมูลที่มีอยู่ (ถ้ามี)
+  Future<void> _loadExistingData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // ดึงข้อมูลล่าสุดจาก Firestore
+      QuerySnapshot querySnapshot = await cycleCollection.orderBy('timestamp', descending: true).limit(1).get();
+      if (querySnapshot.docs.isNotEmpty) {
+        var doc = querySnapshot.docs.first;
+        _documentId = doc.id; // เก็บ ID ของเอกสาร
+        var data = doc.data() as Map<String, dynamic>;
+
+        // เติมข้อมูลลงใน TextField
+        _nameController.text = data['name'] ?? '';
+        _ageController.text = data['age']?.toString() ?? '';
+        _emailController.text = data['email'] ?? '';
+        _selectedStatus = data['status'] ?? 'โสด';
+        _weightController.text = data['weight']?.toString() ?? '';
+        _heightController.text = data['height']?.toString() ?? '';
+      }
+    } catch (e) {
+      print('Error loading data: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,10 +72,8 @@ class _AccountPageState extends State<AccountPage> {
           ),
         ),
         centerTitle: true,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: Color(0xFFFF5A8C)),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: null,
+        automaticallyImplyLeading: false,
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -170,42 +205,79 @@ class _AccountPageState extends State<AccountPage> {
                     // Submit Button
                     _isLoading 
                       ? Center(child: CircularProgressIndicator(color: Color(0xFFFF5A8C)))
-                      : Container(
-                          width: double.infinity,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(25),
-                            gradient: LinearGradient(
-                              colors: [Color(0xFFFF5A8C), Color(0xFFFF85B1)],
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0xFFFF5A8C).withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: ElevatedButton(
-                            onPressed: _submitForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              shape: RoundedRectangleBorder(
+                      : Column(
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              height: 50,
+                              decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(25),
+                                gradient: LinearGradient(
+                                  colors: [Color(0xFFFF5A8C), Color(0xFFFF85B1)],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Color(0xFFFF5A8C).withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: _submitForm,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(25),
+                                  ),
+                                ),
+                                child: Text(
+                                  _documentId == null ? "บันทึกข้อมูล" : "อัปเดตข้อมูล",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white),
+                                ),
                               ),
                             ),
-                            child: Text(
-                              "บันทึกข้อมูล",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                            SizedBox(height: 16),
+                            if (_documentId != null)
+                              Container(
+                                width: double.infinity,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(25),
+                                  color: Colors.red,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.red.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ElevatedButton(
+                                  onPressed: _deleteData,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    shadowColor: Colors.transparent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(25),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    "ลบข้อมูล",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
+                          ],
                         ),
                     
                     SizedBox(height: 24),
@@ -265,7 +337,6 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
   
-  // Build Navbar (same as in period tracker)
   Widget _buildAnimatedNavbar() {
     return Container(
       decoration: BoxDecoration(
@@ -290,10 +361,10 @@ class _AccountPageState extends State<AccountPage> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(Icons.dashboard_outlined, false, () {
-                Navigator.pop(context);
+                Navigator.of(context).popUntil((route) => route.isFirst);
               }),
               _buildNavItem(Icons.calendar_today_outlined, false, () {
-                Navigator.pop(context);
+                Navigator.of(context).popUntil((route) => route.isFirst);
               }),
               _buildNavItem(Icons.account_circle, true, () {
                 // Already on this page
@@ -304,7 +375,7 @@ class _AccountPageState extends State<AccountPage> {
       ),
     );
   }
-  
+
   // Build Nav Item (center-aligned)
   Widget _buildNavItem(IconData icon, bool isSelected, VoidCallback onTap) {
     return GestureDetector(
@@ -331,8 +402,7 @@ class _AccountPageState extends State<AccountPage> {
       });
       
       try {
-        // สร้าง document ใหม่ใน collection 'cycle'
-        await cycleCollection.add({
+        Map<String, dynamic> data = {
           'name': _nameController.text,
           'age': int.parse(_ageController.text),
           'email': _emailController.text,
@@ -340,11 +410,19 @@ class _AccountPageState extends State<AccountPage> {
           'weight': double.parse(_weightController.text),
           'height': double.parse(_heightController.text),
           'timestamp': FieldValue.serverTimestamp(),
-        });
+        };
+
+        if (_documentId == null) {
+          // สร้าง document ใหม่ใน collection 'cycle'
+          await cycleCollection.add(data);
+        } else {
+          // อัปเดต document ที่มีอยู่
+          await cycleCollection.doc(_documentId).update(data);
+        }
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("บันทึกข้อมูลสำเร็จ!"),
+            content: Text(_documentId == null ? "บันทึกข้อมูลสำเร็จ!" : "อัปเดตข้อมูลสำเร็จ!"),
             backgroundColor: Color(0xFF4CAF50),
           )
         );
@@ -354,14 +432,46 @@ class _AccountPageState extends State<AccountPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("เกิดข้อผิดพลาด: $e"),
-            backgroundColor: Colors.red,
-          )
-        );
+            backgroundColor: Colors.red),
+          );
+        
       } finally {
         setState(() {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _deleteData() async {
+    if (_documentId == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await cycleCollection.doc(_documentId).delete();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("ลบข้อมูลสำเร็จ!"),
+          backgroundColor: Color(0xFF4CAF50),
+        )
+      );
+      _clearForm();
+      _documentId = null;
+    } catch (e) {
+      print('Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("เกิดข้อผิดพลาด: $e"),
+          backgroundColor: Colors.red),
+        );
+      
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
   
@@ -374,9 +484,9 @@ class _AccountPageState extends State<AccountPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("กรุณากรอกข้อมูลให้ครบทุกช่อง"),
-          backgroundColor: Colors.red,
-        )
-      );
+          backgroundColor: Colors.red),
+        );
+      
       return false;
     }
     
@@ -387,9 +497,9 @@ class _AccountPageState extends State<AccountPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("กรุณาระบุอายุเป็นตัวเลขจำนวนเต็ม"),
-          backgroundColor: Colors.red,
-        )
-      );
+          backgroundColor: Colors.red),
+        );
+      
       return false;
     }
     
@@ -401,9 +511,9 @@ class _AccountPageState extends State<AccountPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("กรุณาระบุน้ำหนักและส่วนสูงเป็นตัวเลข"),
-          backgroundColor: Colors.red,
-        )
-      );
+          backgroundColor: Colors.red),
+        );
+      
       return false;
     }
     
@@ -412,9 +522,9 @@ class _AccountPageState extends State<AccountPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("กรุณาระบุอีเมลให้ถูกต้อง"),
-          backgroundColor: Colors.red,
-        )
-      );
+          backgroundColor: Colors.red),
+        );
+      
       return false;
     }
     
